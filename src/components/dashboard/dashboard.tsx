@@ -27,7 +27,9 @@ import {
   Camera,
   Eye,
   Activity,
+  Radio,
 } from "lucide-react";
+import { useLiveData } from "@/hooks/use-live-data";
 import type { Track, GlobeView, UIState, TrackHistory, LiveFeedEntry } from "@/types";
 import { REGION_PRESETS, EVENTS, CAMERAS, HISTORY_STEPS } from "@/lib/data/constants";
 import {
@@ -70,6 +72,7 @@ export default function Dashboard() {
     satellite: true,
   });
   const [refreshMs, setRefreshMs] = useState([1200]);
+  const [useRealData, setUseRealData] = useState(false);
   const [lastUpdated, setLastUpdated] = useState(new Date());
   const [liveFeed, setLiveFeed] = useState<LiveFeedEntry[]>([
     {
@@ -80,6 +83,17 @@ export default function Dashboard() {
       detail: "Synthetic global watch surface online.",
     },
   ]);
+
+  // Real data from APIs
+  const liveData = useLiveData(useRealData, 20000);
+
+  // Merge real + synthetic tracks
+  const mergedTracks = useMemo(() => {
+    if (!useRealData) return tracks;
+    const live = [...liveData.aircraft, ...liveData.satellites, ...liveData.vessels];
+    if (live.length === 0) return tracks; // fallback to synthetic if no data yet
+    return [...live, ...tracks.filter((t) => !t.isLive)];
+  }, [useRealData, tracks, liveData.aircraft, liveData.satellites, liveData.vessels]);
 
   const validationErrors = useMemo(
     () => [...validateSeed(TRACKS_SEED), ...validateRegionPresets(REGION_PRESETS)],
@@ -119,7 +133,7 @@ export default function Dashboard() {
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return tracks.filter((t) => {
+    return mergedTracks.filter((t) => {
       if (!showTypes[t.type]) return false;
       if (onlyMilitary && !t.military) return false;
       if (hideCommercial && t.category === "commercial") return false;
@@ -130,7 +144,7 @@ export default function Dashboard() {
         .toLowerCase()
         .includes(q);
     });
-  }, [tracks, query, onlyMilitary, hideCommercial, showTypes]);
+  }, [mergedTracks, query, onlyMilitary, hideCommercial, showTypes]);
 
   const selectedLive =
     filtered.find((t) => t.id === selected?.id) ||
@@ -159,11 +173,11 @@ export default function Dashboard() {
 
   const stats = useMemo(
     () => ({
-      aircraft: tracks.filter((t) => t.type === "aircraft").length,
-      vessels: tracks.filter((t) => t.type === "vessel").length,
-      satellites: tracks.filter((t) => t.type === "satellite").length,
+      aircraft: mergedTracks.filter((t) => t.type === "aircraft").length,
+      vessels: mergedTracks.filter((t) => t.type === "vessel").length,
+      satellites: mergedTracks.filter((t) => t.type === "satellite").length,
     }),
-    [tracks]
+    [mergedTracks]
   );
 
   const liveStatus = liveMode ? (playing ? "Live" : "Standby") : "Offline";
@@ -288,6 +302,31 @@ export default function Dashboard() {
                     <Slider value={refreshMs} onValueChange={(v) => setRefreshMs(Array.isArray(v) ? [...v] : [v])} min={500} max={3000} step={100} />
                   </div>
                 </div>
+                <div className="flex items-center justify-between rounded-2xl border border-zinc-800 bg-zinc-950 p-3">
+                  <div className="flex items-center gap-2">
+                    <Radio
+                      className={`h-4 w-4 ${useRealData ? "text-cyan-300" : "text-zinc-500"}`}
+                    />
+                    <div>
+                      <div className="font-medium">Real data</div>
+                      <div className="text-xs text-zinc-400">
+                        {useRealData
+                          ? liveData.loading
+                            ? "Fetching..."
+                            : `${liveData.aircraft.length} aircraft, ${liveData.satellites.length} sats, ${liveData.vessels.length} vessels`
+                          : "OpenSky + CelesTrak + AIS"}
+                      </div>
+                    </div>
+                  </div>
+                  <Switch checked={useRealData} onCheckedChange={setUseRealData} />
+                </div>
+                {liveData.errors.length > 0 && useRealData && (
+                  <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-200">
+                    {liveData.errors.map((err) => (
+                      <div key={err}>{err} — using synthetic fallback</div>
+                    ))}
+                  </div>
+                )}
                 {validationErrors.length > 0 && (
                   <div className="rounded-2xl border border-red-500/30 bg-red-500/10 p-3 text-xs text-red-100">
                     {validationErrors.map((err) => (
