@@ -30,6 +30,8 @@ import {
   Radio,
 } from "lucide-react";
 import { useLiveData } from "@/hooks/use-live-data";
+import { useEventStream } from "@/hooks/use-event-stream";
+import { useKeyboardShortcuts } from "@/hooks/use-keyboard-shortcuts";
 import type { Track, GlobeView, UIState, TrackHistory, LiveFeedEntry } from "@/types";
 import { REGION_PRESETS, EVENTS, CAMERAS, HISTORY_STEPS } from "@/lib/data/constants";
 import {
@@ -37,11 +39,13 @@ import {
   stepTrack,
   validateSeed,
   validateRegionPresets,
+  clamp,
 } from "@/lib/data/tracks";
 import { formatClock, buildLiveEntries } from "@/lib/data/feed";
 import { badgeTone } from "@/lib/data/styles";
 import { GlobeSurface } from "./globe-surface";
 import { RegistryRow } from "./registry-row";
+import { AnalystPanel } from "./ai/analyst-panel";
 
 const TRACKS_SEED = buildInitialTracks();
 
@@ -203,6 +207,45 @@ export default function Dashboard() {
     ]);
   }, []);
 
+  // SSE stream for real-time data
+  const stream = useEventStream(useRealData && liveMode);
+
+  // Merge SSE stream tracks when available
+  const finalTracks = useMemo(() => {
+    if (stream.connected && stream.tracks.length > 0) {
+      // SSE stream provides aircraft; keep synthetic vessels + satellites
+      const nonAircraft = filtered.filter((t) => t.type !== "aircraft");
+      return [...stream.tracks, ...nonAircraft];
+    }
+    return filtered;
+  }, [stream.connected, stream.tracks, filtered]);
+
+  // Search input ref for keyboard shortcut
+  const searchRef = useRef<HTMLInputElement>(null);
+
+  // Keyboard shortcuts
+  useKeyboardShortcuts(
+    useMemo(
+      () => ({
+        onTogglePlay: () => setPlaying((v) => !v),
+        onReset: handleReset,
+        onNextTrack: () => {
+          const idx = finalTracks.findIndex((t) => t.id === selectedLive?.id);
+          if (idx < finalTracks.length - 1) setSelected(finalTracks[idx + 1]);
+        },
+        onPrevTrack: () => {
+          const idx = finalTracks.findIndex((t) => t.id === selectedLive?.id);
+          if (idx > 0) setSelected(finalTracks[idx - 1]);
+        },
+        onZoomIn: () => setView((prev) => ({ ...prev, scale: clamp(prev.scale * 1.15, 180, 1200) })),
+        onZoomOut: () => setView((prev) => ({ ...prev, scale: clamp(prev.scale / 1.15, 180, 1200) })),
+        onFocusSearch: () => searchRef.current?.focus(),
+        onToggleLabels: () => setUi((v) => ({ ...v, labels: !v.labels })),
+      }),
+      [finalTracks, selectedLive, handleReset]
+    )
+  );
+
   return (
     <div className="min-h-screen bg-zinc-950 p-6 text-zinc-100 md:p-8">
       <div className="mx-auto max-w-[1820px] space-y-6">
@@ -213,7 +256,7 @@ export default function Dashboard() {
         >
           {/* ── LEFT COLUMN: Filters + Registry ── */}
           <div className="space-y-6">
-            <Card className="rounded-[28px] border-zinc-800 bg-zinc-900/60">
+            <Card className="rounded-[28px] border-zinc-800/60 bg-zinc-900/40 backdrop-blur-md">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-lg">
                   <Search className="h-5 w-5 text-cyan-300" /> Focus
@@ -239,9 +282,10 @@ export default function Dashboard() {
                   </div>
                 </div>
                 <Input
+                  ref={searchRef}
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
-                  placeholder="Search track, operator, route, airport, port"
+                  placeholder="Search track, operator, route… ( / )"
                   className="border-zinc-700 bg-zinc-950"
                 />
                 <div className="grid grid-cols-2 gap-2">
@@ -337,7 +381,7 @@ export default function Dashboard() {
               </CardContent>
             </Card>
 
-            <Card className="rounded-[28px] border-zinc-800 bg-zinc-900/60">
+            <Card className="rounded-[28px] border-zinc-800/60 bg-zinc-900/40 backdrop-blur-md">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-lg">
                   <Layers className="h-5 w-5 text-violet-300" /> Registry
@@ -365,7 +409,7 @@ export default function Dashboard() {
 
           {/* ── CENTER COLUMN: Globe + Timeline ── */}
           <div className="space-y-6">
-            <Card className="rounded-[28px] border-zinc-800 bg-zinc-900/60 shadow-2xl shadow-black/30">
+            <Card className="rounded-[28px] border-zinc-800/60 bg-zinc-900/40 backdrop-blur-md shadow-2xl shadow-black/30">
               <CardHeader>
                 <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
                   <div>
@@ -412,7 +456,7 @@ export default function Dashboard() {
               </CardHeader>
               <CardContent>
                 <GlobeSurface
-                  tracks={filtered}
+                  tracks={finalTracks}
                   history={history}
                   selected={selectedLive}
                   onSelect={setSelected}
@@ -427,7 +471,7 @@ export default function Dashboard() {
               </CardContent>
             </Card>
 
-            <Card className="rounded-[28px] border-zinc-800 bg-zinc-900/60">
+            <Card className="rounded-[28px] border-zinc-800/60 bg-zinc-900/40 backdrop-blur-md">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-lg">
                   <Eye className="h-5 w-5 text-zinc-300" /> Event timeline
@@ -467,9 +511,31 @@ export default function Dashboard() {
             </Card>
           </div>
 
-          {/* ── RIGHT COLUMN: Live Feed + Narrative + Sources + Alerts/Cameras ── */}
+          {/* ── RIGHT COLUMN: AI + Live Feed + Narrative + Sources + Alerts/Cameras ── */}
           <div className="space-y-6">
-            <Card className="rounded-[28px] border-zinc-800 bg-zinc-900/60">
+            {/* AI Analyst */}
+            <AnalystPanel tracks={finalTracks} />
+
+            {/* SSE Stream Status */}
+            {useRealData && (
+              <div className={`flex items-center gap-3 rounded-2xl border p-3 text-sm ${
+                stream.connected
+                  ? "border-emerald-400/20 bg-emerald-500/5 text-emerald-200"
+                  : "border-zinc-800 bg-zinc-950 text-zinc-400"
+              }`}>
+                <div className={`h-2 w-2 rounded-full ${stream.connected ? "bg-emerald-400 animate-pulse" : "bg-zinc-600"}`} />
+                <div>
+                  <span className="font-medium">{stream.connected ? "SSE Stream Active" : "Stream Disconnected"}</span>
+                  {stream.lastUpdate && (
+                    <span className="ml-2 text-xs text-zinc-500">
+                      Last: {formatClock(stream.lastUpdate)}
+                    </span>
+                  )}
+                </div>
+              </div>
+            )}
+
+            <Card className="rounded-[28px] border-zinc-800/60 bg-zinc-900/40 backdrop-blur-md">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-lg">
                   <Activity className="h-5 w-5 text-emerald-300" /> Live feed
@@ -507,7 +573,7 @@ export default function Dashboard() {
               </CardContent>
             </Card>
 
-            <Card className="rounded-[28px] border-zinc-800 bg-zinc-900/60">
+            <Card className="rounded-[28px] border-zinc-800/60 bg-zinc-900/40 backdrop-blur-md">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-lg">
                   <AlertTriangle className="h-5 w-5 text-amber-300" /> Narrative
@@ -575,7 +641,7 @@ export default function Dashboard() {
               </CardContent>
             </Card>
 
-            <Card className="rounded-[28px] border-zinc-800 bg-zinc-900/60">
+            <Card className="rounded-[28px] border-zinc-800/60 bg-zinc-900/40 backdrop-blur-md">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-lg">
                   <Layers className="h-5 w-5 text-cyan-300" /> Sources
@@ -618,7 +684,7 @@ export default function Dashboard() {
                 <TabsTrigger value="cameras">Cameras</TabsTrigger>
               </TabsList>
               <TabsContent value="alerts">
-                <Card className="rounded-[28px] border-zinc-800 bg-zinc-900/60">
+                <Card className="rounded-[28px] border-zinc-800/60 bg-zinc-900/40 backdrop-blur-md">
                   <CardContent className="space-y-3 p-6">
                     {EVENTS.map((event) => (
                       <div
@@ -649,7 +715,7 @@ export default function Dashboard() {
                 </Card>
               </TabsContent>
               <TabsContent value="cameras">
-                <Card className="rounded-[28px] border-zinc-800 bg-zinc-900/60">
+                <Card className="rounded-[28px] border-zinc-800/60 bg-zinc-900/40 backdrop-blur-md">
                   <CardContent className="space-y-3 p-6">
                     {CAMERAS.map((cam) => (
                       <div
@@ -674,6 +740,16 @@ export default function Dashboard() {
             </Tabs>
           </div>
         </motion.div>
+
+        {/* Keyboard shortcuts bar */}
+        <div className="flex flex-wrap items-center justify-center gap-4 rounded-2xl border border-zinc-800/50 bg-zinc-900/30 px-4 py-2 text-xs text-zinc-500 backdrop-blur-sm">
+          <span><kbd className="kbd">Space</kbd> Play/Pause</span>
+          <span><kbd className="kbd">↑</kbd><kbd className="kbd">↓</kbd> Cycle tracks</span>
+          <span><kbd className="kbd">+</kbd><kbd className="kbd">-</kbd> Zoom</span>
+          <span><kbd className="kbd">/</kbd> Search</span>
+          <span><kbd className="kbd">L</kbd> Labels</span>
+          <span><kbd className="kbd">R</kbd> Reset</span>
+        </div>
       </div>
     </div>
   );
