@@ -247,12 +247,12 @@ export default function Dashboard() {
   );
 
   return (
-    <div className="min-h-screen bg-zinc-950 p-6 text-zinc-100 md:p-8">
+    <div className="min-h-screen bg-zinc-950 p-4 text-zinc-100 md:p-6 lg:p-8">
       <div className="mx-auto max-w-[1820px] space-y-6">
         <motion.div
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
-          className="grid gap-6 xl:grid-cols-[320px_minmax(0,1fr)_360px]"
+          className="grid gap-6 md:grid-cols-[280px_minmax(0,1fr)] xl:grid-cols-[320px_minmax(0,1fr)_360px]"
         >
           {/* ── LEFT COLUMN: Filters + Registry ── */}
           <div className="space-y-6">
@@ -391,7 +391,7 @@ export default function Dashboard() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <ScrollArea className="h-[620px] pr-4">
+                <ScrollArea className="h-[420px] md:h-[520px] xl:h-[620px] pr-4">
                   <div className="space-y-3">
                     {filtered.map((track) => (
                       <RegistryRow
@@ -742,7 +742,7 @@ export default function Dashboard() {
         </motion.div>
 
         {/* Keyboard shortcuts bar */}
-        <div className="flex flex-wrap items-center justify-center gap-4 rounded-2xl border border-zinc-800/50 bg-zinc-900/30 px-4 py-2 text-xs text-zinc-500 backdrop-blur-sm">
+        <div className="flex flex-wrap items-center justify-center gap-4 rounded-2xl border border-zinc-800/50 bg-zinc-900/30 px-4 py-2 text-xs text-zinc-400 backdrop-blur-sm">
           <span><kbd className="kbd">Space</kbd> Play/Pause</span>
           <span><kbd className="kbd">↑</kbd><kbd className="kbd">↓</kbd> Cycle tracks</span>
           <span><kbd className="kbd">+</kbd><kbd className="kbd">-</kbd> Zoom</span>

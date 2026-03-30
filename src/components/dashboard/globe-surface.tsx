@@ -160,7 +160,7 @@ export function GlobeSurface({
         <div className="overflow-hidden rounded-[24px] border border-zinc-800 bg-black">
           <svg
             viewBox={`0 0 ${GLOBE_W} ${GLOBE_H}`}
-            className="h-[600px] w-full touch-none cursor-grab"
+            className="h-[50vh] min-h-[380px] max-h-[680px] w-full touch-none cursor-grab"
             onPointerDown={(e) => drag.onPointerDown(e, view)}
             onPointerMove={drag.onPointerMove}
             onPointerUp={drag.onPointerUp}
@@ -191,6 +191,29 @@ export function GlobeSurface({
                 <stop offset="0%" stopColor="#38bdf8" stopOpacity="0.18" />
                 <stop offset="100%" stopColor="#8b5cf6" stopOpacity="0.08" />
               </linearGradient>
+              <radialGradient id="rimAmbient" cx="50%" cy="50%" r="50%">
+                <stop offset="85%" stopColor="transparent" />
+                <stop offset="100%" stopColor="rgba(56,189,248,0.06)" />
+              </radialGradient>
+              {/* Glow filters for selected track */}
+              <filter id="glowCyan" x="-50%" y="-50%" width="200%" height="200%">
+                <feGaussianBlur stdDeviation="4" result="blur" />
+                <feFlood floodColor="#22d3ee" floodOpacity="0.6" result="color" />
+                <feComposite in="color" in2="blur" operator="in" result="glow" />
+                <feMerge><feMergeNode in="glow" /><feMergeNode in="SourceGraphic" /></feMerge>
+              </filter>
+              <filter id="glowAmber" x="-50%" y="-50%" width="200%" height="200%">
+                <feGaussianBlur stdDeviation="4" result="blur" />
+                <feFlood floodColor="#fb923c" floodOpacity="0.6" result="color" />
+                <feComposite in="color" in2="blur" operator="in" result="glow" />
+                <feMerge><feMergeNode in="glow" /><feMergeNode in="SourceGraphic" /></feMerge>
+              </filter>
+              <filter id="glowViolet" x="-50%" y="-50%" width="200%" height="200%">
+                <feGaussianBlur stdDeviation="4" result="blur" />
+                <feFlood floodColor="#8b5cf6" floodOpacity="0.6" result="color" />
+                <feComposite in="color" in2="blur" operator="in" result="glow" />
+                <feMerge><feMergeNode in="glow" /><feMergeNode in="SourceGraphic" /></feMerge>
+              </filter>
             </defs>
 
             {/* Globe base */}
@@ -294,13 +317,36 @@ export function GlobeSurface({
               const fill = tone(track);
               const selectedNow = selected?.id === track.id;
               return (
-                <g key={track.id} onClick={() => onSelect(track)} className="cursor-pointer">
+                <g
+                  key={track.id}
+                  onClick={() => onSelect(track)}
+                  className="cursor-pointer"
+                  filter={selectedNow ? (track.military ? "url(#glowAmber)" : track.type === "satellite" ? "url(#glowViolet)" : "url(#glowCyan)") : undefined}
+                  role="button"
+                  tabIndex={-1}
+                  aria-label={`${track.id} ${track.type} ${track.operator}`}
+                >
+                  {/* Pulse ring for military tracks */}
+                  {track.military && (
+                    <circle
+                      cx={p[0]}
+                      cy={p[1]}
+                      r={12}
+                      fill="none"
+                      stroke={fill}
+                      strokeOpacity="0.4"
+                      strokeWidth="1"
+                    >
+                      <animate attributeName="r" from="8" to="18" dur="2s" repeatCount="indefinite" />
+                      <animate attributeName="stroke-opacity" from="0.5" to="0" dur="2s" repeatCount="indefinite" />
+                    </circle>
+                  )}
                   <circle
                     cx={p[0]}
                     cy={p[1]}
-                    r={selectedNow ? 10 : track.type === "satellite" ? 5 : 6}
+                    r={selectedNow ? 12 : track.type === "satellite" ? 5 : 6}
                     fill={fill}
-                    fillOpacity="0.18"
+                    fillOpacity={selectedNow ? "0.25" : "0.18"}
                   />
                   {track.type === "aircraft" && (
                     <path
