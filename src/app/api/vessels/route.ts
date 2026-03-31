@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-export const runtime = "edge";
+export const runtime = "nodejs";
 
 // AIS data from a public aggregator endpoint
 // For production, use aisstream.io WebSocket client-side with an API key

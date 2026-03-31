@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 
-export const runtime = "edge";
+export const runtime = "nodejs";
 
 // Server-Sent Events stream for real-time track updates
 // Polls OpenSky every 15s and pushes diffs to connected clients

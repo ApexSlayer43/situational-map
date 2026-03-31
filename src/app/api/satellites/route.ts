@@ -8,7 +8,7 @@ import {
   degreesLat,
 } from "satellite.js";
 
-export const runtime = "edge";
+export const runtime = "nodejs";
 
 const CELESTRAK_URL =
   "https://celestrak.org/NORAD/elements/gp.php?GROUP=active&FORMAT=tle";
