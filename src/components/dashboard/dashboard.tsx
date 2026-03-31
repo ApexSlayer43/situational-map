@@ -548,7 +548,7 @@ export default function Dashboard() {
           {/* ── RIGHT COLUMN: AI + Live Feed + Narrative + Sources + Alerts/Cameras ── */}
           <div className="space-y-6">
             {/* AI Analyst */}
-            <AnalystPanel tracks={finalTracks} />
+            <AnalystPanel tracks={mergedTracks} useRealData={useRealData} />
 
             {/* SSE Stream Status */}
             {useRealData && (

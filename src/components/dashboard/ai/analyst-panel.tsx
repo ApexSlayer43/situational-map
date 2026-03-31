@@ -16,9 +16,10 @@ import type { Track } from "@/types";
 
 interface AnalystPanelProps {
   tracks: Track[];
+  useRealData: boolean;
 }
 
-export function AnalystPanel({ tracks }: AnalystPanelProps) {
+export function AnalystPanel({ tracks, useRealData }: AnalystPanelProps) {
   const [query, setQuery] = useState("");
   const [lastBrief, setLastBrief] = useState<string | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -30,7 +31,10 @@ export function AnalystPanel({ tracks }: AnalystPanelProps) {
       setFallbackBrief(null);
 
       try {
-        const snapshot = tracks.slice(0, 50).map((t) => ({
+        // Prioritize live tracks for analysis, fall back to synthetic
+        const liveTracks = tracks.filter((t) => t.isLive);
+        const source = liveTracks.length > 0 ? liveTracks : tracks;
+        const snapshot = source.slice(0, 60).map((t) => ({
           id: t.id,
           type: t.type,
           category: t.category,
@@ -41,12 +45,14 @@ export function AnalystPanel({ tracks }: AnalystPanelProps) {
           altitude: t.altitude,
           heading: t.heading,
           military: t.military,
+          isLive: t.isLive ?? false,
+          ...(t.type === "seismic" ? { mag: t.mag, tsunami: t.tsunami, alert: t.alert, depth: -t.altitude } : {}),
         }));
 
         const res = await fetch("/api/analyze", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ tracks: snapshot, context }),
+          body: JSON.stringify({ tracks: snapshot, context, dataMode: useRealData ? "live" : "simulated" }),
         });
 
         const contentType = res.headers.get("content-type") || "";
