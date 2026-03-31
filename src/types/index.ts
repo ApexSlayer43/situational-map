@@ -31,8 +31,21 @@ export interface GlobeView {
   scale: number;
 }
 
-export type TrackType = "aircraft" | "vessel" | "satellite";
+export type TrackType = "aircraft" | "vessel" | "satellite" | "seismic";
 export type TrackCategory = "commercial" | "military" | "civil";
+
+export interface SeismicEvent {
+  id: string;
+  mag: number;
+  place: string;
+  time: number;
+  lat: number;
+  lon: number;
+  depth: number;
+  tsunami: boolean;
+  alert: string | null;
+  sig: number;
+}
 
 export interface Track {
   id: string;
@@ -61,6 +74,12 @@ export interface Track {
   drift?: number;
   // Live data flag
   isLive?: boolean;
+  // Seismic-specific
+  mag?: number;
+  tsunami?: boolean;
+  alert?: string | null;
+  sig?: number;
+  seismicTime?: number;
 }
 
 export interface AirRoute {

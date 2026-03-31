@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useCallback } from "react";
-import type { Track } from "@/types";
+import type { Track, SeismicEvent } from "@/types";
 
 interface OpenSkyState {
   icao24: string;
@@ -82,10 +82,33 @@ function vesselToTrack(v: VesselPos): Track {
   };
 }
 
+function seismicToTrack(e: SeismicEvent): Track {
+  return {
+    id: `EQ-${e.id}`,
+    type: "seismic",
+    category: "civil",
+    operator: e.place,
+    military: false,
+    lon: e.lon,
+    lat: e.lat,
+    heading: 0,
+    speed: 0,
+    altitude: -e.depth,
+    isLive: true,
+    // Store magnitude in speed field for display purposes
+    mag: e.mag,
+    tsunami: e.tsunami,
+    alert: e.alert,
+    sig: e.sig,
+    seismicTime: e.time,
+  };
+}
+
 export interface LiveDataState {
   aircraft: Track[];
   satellites: Track[];
   vessels: Track[];
+  seismic: Track[];
   errors: string[];
   lastFetch: Date | null;
   loading: boolean;
@@ -96,6 +119,7 @@ export function useLiveData(enabled: boolean, intervalMs: number = 20000) {
     aircraft: [],
     satellites: [],
     vessels: [],
+    seismic: [],
     errors: [],
     lastFetch: null,
     loading: false,
@@ -114,8 +138,8 @@ export function useLiveData(enabled: boolean, intervalMs: number = 20000) {
 
     const errors: string[] = [];
 
-    // Fetch all three in parallel
-    const [aircraftRes, satelliteRes, vesselRes] = await Promise.allSettled([
+    // Fetch all four in parallel
+    const [aircraftRes, satelliteRes, vesselRes, seismicRes] = await Promise.allSettled([
       fetch("/api/opensky", { signal: controller.signal })
         .then((r) => r.json())
         .then((data) => (data.states || []).map(openskyToTrack)),
@@ -125,6 +149,9 @@ export function useLiveData(enabled: boolean, intervalMs: number = 20000) {
       fetch("/api/vessels", { signal: controller.signal })
         .then((r) => r.json())
         .then((data) => (data.vessels || []).map(vesselToTrack)),
+      fetch("/api/seismic", { signal: controller.signal })
+        .then((r) => r.json())
+        .then((data) => (data.events || []).map(seismicToTrack)),
     ]);
 
     const aircraft =
@@ -142,11 +169,17 @@ export function useLiveData(enabled: boolean, intervalMs: number = 20000) {
     if (vesselRes.status === "rejected")
       errors.push("Vessel data unavailable");
 
+    const seismic =
+      seismicRes.status === "fulfilled" ? seismicRes.value : [];
+    if (seismicRes.status === "rejected")
+      errors.push("Seismic data unavailable");
+
     if (!controller.signal.aborted) {
       setState({
         aircraft,
         satellites,
         vessels,
+        seismic,
         errors,
         lastFetch: new Date(),
         loading: false,

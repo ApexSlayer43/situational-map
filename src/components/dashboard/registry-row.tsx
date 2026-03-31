@@ -35,8 +35,8 @@ export function RegistryRow({ track, selected, onSelect }: RegistryRowProps) {
       </div>
       <div className="mt-3 grid grid-cols-3 gap-2 text-xs text-zinc-400">
         <div>{track.type}</div>
-        <div>Lat {track.lat.toFixed(1)}</div>
-        <div>Lon {track.lon.toFixed(1)}</div>
+        <div>{track.type === "seismic" ? `M${track.mag?.toFixed(1)}` : `Lat ${track.lat.toFixed(1)}`}</div>
+        <div>{track.type === "seismic" ? `${-track.altitude}km deep` : `Lon ${track.lon.toFixed(1)}`}</div>
       </div>
     </button>
   );

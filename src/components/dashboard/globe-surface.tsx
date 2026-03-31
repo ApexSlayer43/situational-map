@@ -148,6 +148,9 @@ export function GlobeSurface({
             <Badge className="border-violet-400/20 bg-violet-400/10 text-violet-200">
               {tracks.filter((t) => t.type === "satellite").length} satellites
             </Badge>
+            <Badge className="border-yellow-400/20 bg-yellow-400/10 text-yellow-200">
+              {tracks.filter((t) => t.type === "seismic").length} seismic
+            </Badge>
             <Badge className="border-zinc-700 bg-zinc-900 text-zinc-100">
               {visibleTracks.length} visible
             </Badge>
@@ -211,6 +214,12 @@ export function GlobeSurface({
               <filter id="glowViolet" x="-50%" y="-50%" width="200%" height="200%">
                 <feGaussianBlur stdDeviation="4" result="blur" />
                 <feFlood floodColor="#8b5cf6" floodOpacity="0.6" result="color" />
+                <feComposite in="color" in2="blur" operator="in" result="glow" />
+                <feMerge><feMergeNode in="glow" /><feMergeNode in="SourceGraphic" /></feMerge>
+              </filter>
+              <filter id="glowSeismic" x="-50%" y="-50%" width="200%" height="200%">
+                <feGaussianBlur stdDeviation="5" result="blur" />
+                <feFlood floodColor="#facc15" floodOpacity="0.7" result="color" />
                 <feComposite in="color" in2="blur" operator="in" result="glow" />
                 <feMerge><feMergeNode in="glow" /><feMergeNode in="SourceGraphic" /></feMerge>
               </filter>
@@ -321,7 +330,7 @@ export function GlobeSurface({
                   key={track.id}
                   onClick={() => onSelect(track)}
                   className="cursor-pointer"
-                  filter={selectedNow ? (track.military ? "url(#glowAmber)" : track.type === "satellite" ? "url(#glowViolet)" : "url(#glowCyan)") : undefined}
+                  filter={selectedNow ? (track.type === "seismic" ? "url(#glowSeismic)" : track.military ? "url(#glowAmber)" : track.type === "satellite" ? "url(#glowViolet)" : "url(#glowCyan)") : undefined}
                   role="button"
                   tabIndex={-1}
                   aria-label={`${track.id} ${track.type} ${track.operator}`}
@@ -367,6 +376,16 @@ export function GlobeSurface({
                       fill={fill}
                     />
                   )}
+                  {track.type === "seismic" && (
+                    <g>
+                      <circle cx={p[0]} cy={p[1]} r={Math.max(4, (track.mag ?? 3) * 2)} fill={fill} fillOpacity="0.35" />
+                      <circle cx={p[0]} cy={p[1]} r={4} fill={fill} />
+                      <circle cx={p[0]} cy={p[1]} r={Math.max(6, (track.mag ?? 3) * 2.5)} fill="none" stroke={fill} strokeOpacity="0.5" strokeWidth="1">
+                        <animate attributeName="r" from={String(Math.max(6, (track.mag ?? 3) * 2))} to={String(Math.max(18, (track.mag ?? 3) * 5))} dur="2.5s" repeatCount="indefinite" />
+                        <animate attributeName="stroke-opacity" from="0.6" to="0" dur="2.5s" repeatCount="indefinite" />
+                      </circle>
+                    </g>
+                  )}
                   {ui.labels && view.scale > 320 && (
                     <>
                       <line
@@ -378,7 +397,7 @@ export function GlobeSurface({
                         strokeOpacity="0.65"
                       />
                       <text x={p[0] + 17} y={p[1] - 12} fill={fill} fontSize="10.5">
-                        {track.id}
+                        {track.type === "seismic" ? `M${track.mag?.toFixed(1)}` : track.id}
                       </text>
                     </>
                   )}

@@ -74,6 +74,7 @@ export default function Dashboard() {
     aircraft: true,
     vessel: true,
     satellite: true,
+    seismic: true,
   });
   const [refreshMs, setRefreshMs] = useState([1200]);
   const [useRealData, setUseRealData] = useState(false);
@@ -94,7 +95,7 @@ export default function Dashboard() {
   // Merge real + synthetic tracks
   const mergedTracks = useMemo(() => {
     if (!useRealData) return tracks;
-    const live = [...liveData.aircraft, ...liveData.satellites, ...liveData.vessels];
+    const live = [...liveData.aircraft, ...liveData.satellites, ...liveData.vessels, ...liveData.seismic];
     if (live.length === 0) return tracks; // fallback to synthetic if no data yet
     return [...live, ...tracks.filter((t) => !t.isLive)];
   }, [useRealData, tracks, liveData.aircraft, liveData.satellites, liveData.vessels]);
@@ -180,6 +181,7 @@ export default function Dashboard() {
       aircraft: mergedTracks.filter((t) => t.type === "aircraft").length,
       vessels: mergedTracks.filter((t) => t.type === "vessel").length,
       satellites: mergedTracks.filter((t) => t.type === "satellite").length,
+      seismic: mergedTracks.filter((t) => t.type === "seismic").length,
     }),
     [mergedTracks]
   );
@@ -294,6 +296,7 @@ export default function Dashboard() {
                       ["aircraft", `Aircraft ${stats.aircraft}`],
                       ["vessel", `Vessels ${stats.vessels}`],
                       ["satellite", `Satellites ${stats.satellites}`],
+                      ["seismic", `Seismic ${stats.seismic}`],
                     ] as const
                   ).map(([key, label]) => (
                     <button
@@ -357,8 +360,8 @@ export default function Dashboard() {
                         {useRealData
                           ? liveData.loading
                             ? "Fetching..."
-                            : `${liveData.aircraft.length} aircraft, ${liveData.satellites.length} sats, ${liveData.vessels.length} vessels`
-                          : "OpenSky + CelesTrak + AIS"}
+                            : `${liveData.aircraft.length} aircraft, ${liveData.satellites.length} sats, ${liveData.vessels.length} vessels, ${liveData.seismic.length} quakes`
+                          : "OpenSky + CelesTrak + AIS + USGS"}
                       </div>
                     </div>
                   </div>
