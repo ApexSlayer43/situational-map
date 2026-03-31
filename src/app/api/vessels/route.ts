@@ -85,6 +85,12 @@ function collectVessels(
       try {
         const msg = JSON.parse(data.toString());
 
+        // Log errors from AISstream
+        if (msg.error) {
+          console.error("AISstream error message:", msg.error);
+          return;
+        }
+
         if (msg.MessageType !== "PositionReport") return;
 
         const pos = msg.Message?.PositionReport;
