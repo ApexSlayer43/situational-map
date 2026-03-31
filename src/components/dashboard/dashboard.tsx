@@ -46,6 +46,24 @@ import { badgeTone } from "@/lib/data/styles";
 import { GlobeSurface } from "./globe-surface";
 import { RegistryRow } from "./registry-row";
 import { AnalystPanel } from "./ai/analyst-panel";
+import dynamic from "next/dynamic";
+
+const Globe3D = dynamic(() => import("./globe-3d").then((m) => ({ default: m.Globe3D })), {
+  ssr: false,
+  loading: () => (
+    <div className="flex h-[50vh] min-h-[380px] items-center justify-center rounded-2xl border border-zinc-800 bg-zinc-950">
+      <div className="text-center space-y-3">
+        <div className="h-8 w-8 mx-auto animate-spin rounded-full border-2 border-zinc-700 border-t-cyan-400" />
+        <p className="text-zinc-400 text-sm">Loading 3D globe...</p>
+      </div>
+    </div>
+  ),
+});
+
+const TrafficMap = dynamic(() => import("./traffic-map").then((m) => ({ default: m.TrafficMap })), {
+  ssr: false,
+  loading: () => null,
+});
 
 const TRACKS_SEED = buildInitialTracks();
 
@@ -78,6 +96,7 @@ export default function Dashboard() {
   });
   const [refreshMs, setRefreshMs] = useState([1200]);
   const [useRealData, setUseRealData] = useState(false);
+  const [globeMode, setGlobeMode] = useState<"2d" | "3d">("2d");
   const [lastUpdated, setLastUpdated] = useState(new Date());
   const [liveFeed, setLiveFeed] = useState<LiveFeedEntry[]>([
     {
@@ -456,6 +475,28 @@ export default function Dashboard() {
                     </CardDescription>
                   </div>
                   <div className="flex flex-wrap gap-2">
+                    <div className="flex rounded-lg border border-zinc-700 overflow-hidden">
+                      <button
+                        onClick={() => setGlobeMode("2d")}
+                        className={`px-3 py-1.5 text-xs font-medium transition ${
+                          globeMode === "2d"
+                            ? "bg-cyan-500/20 text-cyan-200"
+                            : "bg-zinc-950 text-zinc-400 hover:text-zinc-200"
+                        }`}
+                      >
+                        2D
+                      </button>
+                      <button
+                        onClick={() => setGlobeMode("3d")}
+                        className={`px-3 py-1.5 text-xs font-medium transition ${
+                          globeMode === "3d"
+                            ? "bg-cyan-500/20 text-cyan-200"
+                            : "bg-zinc-950 text-zinc-400 hover:text-zinc-200"
+                        }`}
+                      >
+                        3D
+                      </button>
+                    </div>
                     <Badge
                       className={`${
                         liveMode
@@ -489,19 +530,35 @@ export default function Dashboard() {
                 </div>
               </CardHeader>
               <CardContent>
-                <GlobeSurface
-                  tracks={finalTracks}
-                  history={history}
-                  selected={selectedLive}
-                  onSelect={setSelected}
-                  regionKey={regionKey}
-                  setRegionKey={setRegionKey}
-                  view={view}
-                  setView={setView}
-                  ui={ui}
-                  setUi={setUi}
-                  focusSelected={focusSelected}
-                />
+                {globeMode === "3d" ? (
+                  <Globe3D
+                    tracks={finalTracks}
+                    history={history}
+                    selected={selectedLive}
+                    onSelect={setSelected}
+                    regionKey={regionKey}
+                    setRegionKey={setRegionKey}
+                    view={view}
+                    setView={setView}
+                    ui={ui}
+                    setUi={setUi}
+                    focusSelected={focusSelected}
+                  />
+                ) : (
+                  <GlobeSurface
+                    tracks={finalTracks}
+                    history={history}
+                    selected={selectedLive}
+                    onSelect={setSelected}
+                    regionKey={regionKey}
+                    setRegionKey={setRegionKey}
+                    view={view}
+                    setView={setView}
+                    ui={ui}
+                    setUi={setUi}
+                    focusSelected={focusSelected}
+                  />
+                )}
               </CardContent>
             </Card>
 
@@ -549,6 +606,19 @@ export default function Dashboard() {
           <div className="space-y-6">
             {/* AI Analyst */}
             <AnalystPanel tracks={mergedTracks} useRealData={useRealData} />
+
+            {/* Street Traffic */}
+            <TrafficMap
+              center={
+                regionKey === "usaEast" ? { lat: 40.71, lng: -74.01 } :
+                regionKey === "europe" ? { lat: 48.86, lng: 2.35 } :
+                regionKey === "gulf" ? { lat: 25.28, lng: 55.30 } :
+                regionKey === "eastAsia" ? { lat: 35.68, lng: 139.69 } :
+                regionKey === "atlantic" ? { lat: 51.51, lng: -0.13 } :
+                { lat: 40.71, lng: -74.01 }
+              }
+              zoom={regionKey === "global" ? 3 : 12}
+            />
 
             {/* SSE Stream Status */}
             {useRealData && (
