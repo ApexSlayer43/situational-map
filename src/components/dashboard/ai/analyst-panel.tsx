@@ -57,7 +57,7 @@ export function AnalystPanel({ tracks }: AnalystPanelProps) {
           setFallbackBrief(data.brief || data.error);
           setLastBrief(null);
         } else {
-          // Streaming response
+          // Streaming response — read plain text stream
           const reader = res.body?.getReader();
           const decoder = new TextDecoder();
           let accumulated = "";
@@ -66,22 +66,8 @@ export function AnalystPanel({ tracks }: AnalystPanelProps) {
             while (true) {
               const { done, value } = await reader.read();
               if (done) break;
-              const chunk = decoder.decode(value, { stream: true });
-
-              // Parse SSE data chunks from Vercel AI SDK
-              const lines = chunk.split("\n");
-              for (const line of lines) {
-                if (line.startsWith("0:")) {
-                  // Text delta from AI SDK stream protocol
-                  try {
-                    const text = JSON.parse(line.slice(2));
-                    accumulated += text;
-                    setLastBrief(accumulated);
-                  } catch {
-                    // Not valid JSON, skip
-                  }
-                }
-              }
+              accumulated += decoder.decode(value, { stream: true });
+              setLastBrief(accumulated);
             }
           }
 
