@@ -26,11 +26,19 @@ export async function GET(request: Request) {
   try {
     const url = `https://opensky-network.org/api/states/all?lamin=${lamin}&lamax=${lamax}&lomin=${lomin}&lomax=${lomax}`;
 
+    const headers: Record<string, string> = {
+      "User-Agent": "SituationalMap/1.0",
+    };
+
+    // Optional: basic auth for higher rate limits (free account at opensky-network.org)
+    if (process.env.OPENSKY_USERNAME && process.env.OPENSKY_PASSWORD) {
+      headers["Authorization"] =
+        "Basic " + Buffer.from(`${process.env.OPENSKY_USERNAME}:${process.env.OPENSKY_PASSWORD}`).toString("base64");
+    }
+
     const res = await fetch(url, {
-      headers: {
-        "User-Agent": "SituationalMap/1.0",
-      },
-      signal: AbortSignal.timeout(8000),
+      headers,
+      signal: AbortSignal.timeout(10000),
     });
 
     if (!res.ok) {

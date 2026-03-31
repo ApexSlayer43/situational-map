@@ -6,7 +6,6 @@ import { feature } from "topojson-client";
 import countriesAtlas from "world-atlas/countries-50m.json";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Globe, LocateFixed, ZoomIn, ZoomOut } from "lucide-react";
 import type { Track, GlobeView, UIState, TrackHistory } from "@/types";
 import {
@@ -117,22 +116,24 @@ export function GlobeSurface({
             {REGION_PRESETS[regionKey]?.name ?? "Custom"}
           </Badge>
         </div>
-        <Tabs
-          value={regionKey}
-          onValueChange={(key) => {
-            setRegionKey(key);
-            setView(REGION_PRESETS[key]);
-          }}
-          className="w-full"
-        >
-          <TabsList className="grid w-full grid-cols-3 lg:grid-cols-6 bg-zinc-950">
-            {REGION_KEYS.map((key) => (
-              <TabsTrigger key={key} value={key} className="text-xs">
-                {REGION_PRESETS[key].name}
-              </TabsTrigger>
-            ))}
-          </TabsList>
-        </Tabs>
+        <div className="grid w-full grid-cols-3 gap-1.5 lg:grid-cols-6">
+          {REGION_KEYS.map((key) => (
+            <button
+              key={key}
+              onClick={() => {
+                setRegionKey(key);
+                setView(REGION_PRESETS[key]);
+              }}
+              className={`rounded-lg px-2 py-1.5 text-xs font-medium transition ${
+                regionKey === key
+                  ? "bg-cyan-500/20 text-cyan-200 border border-cyan-400/40"
+                  : "bg-zinc-900 text-zinc-400 border border-zinc-800 hover:text-zinc-200 hover:border-zinc-600"
+              }`}
+            >
+              {REGION_PRESETS[key].name}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Globe */}

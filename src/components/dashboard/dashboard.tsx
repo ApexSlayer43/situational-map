@@ -251,6 +251,37 @@ export default function Dashboard() {
   return (
     <div className="min-h-screen bg-zinc-950 p-4 text-zinc-100 md:p-6 lg:p-8">
       <div className="mx-auto max-w-[1820px] space-y-6">
+        {/* Data mode banner */}
+        <div className={`flex items-center justify-between rounded-2xl border px-5 py-3 ${
+          useRealData
+            ? "border-emerald-400/30 bg-emerald-500/10"
+            : "border-amber-400/30 bg-amber-500/10"
+        }`}>
+          <div className="flex items-center gap-3">
+            <div className={`h-3 w-3 rounded-full ${useRealData ? "bg-emerald-400 animate-pulse" : "bg-amber-400"}`} />
+            <div>
+              <span className={`font-semibold ${useRealData ? "text-emerald-200" : "text-amber-200"}`}>
+                {useRealData ? "LIVE DATA" : "SIMULATED DATA"}
+              </span>
+              <span className="ml-3 text-sm text-zinc-400">
+                {useRealData
+                  ? `${liveData.aircraft.length + liveData.vessels.length + liveData.satellites.length + liveData.seismic.length} real-world tracks from OpenSky + CelesTrak + AIS + USGS`
+                  : "Synthetic tracks — toggle Real Data in the left panel to go live"}
+              </span>
+            </div>
+          </div>
+          <button
+            onClick={() => setUseRealData(!useRealData)}
+            className={`rounded-xl border px-4 py-1.5 text-sm font-medium transition ${
+              useRealData
+                ? "border-emerald-400/40 text-emerald-200 hover:bg-emerald-500/20"
+                : "border-amber-400/40 text-amber-200 hover:bg-amber-500/20"
+            }`}
+          >
+            {useRealData ? "Switch to Simulated" : "Go Live"}
+          </button>
+        </div>
+
         <motion.div
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
@@ -288,7 +319,7 @@ export default function Dashboard() {
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
                   placeholder="Search track, operator, route… ( / )"
-                  className="border-zinc-700 bg-zinc-950"
+                  className="border-zinc-700 bg-zinc-950 text-zinc-100 placeholder:text-zinc-500"
                 />
                 <div className="grid grid-cols-2 gap-2">
                   {(
@@ -315,14 +346,14 @@ export default function Dashboard() {
                 <div className="flex items-center justify-between rounded-2xl border border-zinc-800 bg-zinc-950 p-3">
                   <div>
                     <div className="font-medium">Only military</div>
-                    <div className="text-xs text-zinc-400">Cut the noise fast</div>
+                    <div className="text-xs text-zinc-400">Show military tracks only</div>
                   </div>
                   <Switch checked={onlyMilitary} onCheckedChange={setOnlyMilitary} />
                 </div>
                 <div className="flex items-center justify-between rounded-2xl border border-zinc-800 bg-zinc-950 p-3">
                   <div>
                     <div className="font-medium">Hide commercial</div>
-                    <div className="text-xs text-zinc-400">Remove normal traffic</div>
+                    <div className="text-xs text-zinc-400">Filter out commercial traffic</div>
                   </div>
                   <Switch checked={hideCommercial} onCheckedChange={setHideCommercial} />
                 </div>

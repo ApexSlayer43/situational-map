@@ -134,7 +134,7 @@ export function AnalystPanel({ tracks }: AnalystPanelProps) {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Ask OVERWATCH anything..."
-            className="border-zinc-700 bg-zinc-950"
+            className="border-zinc-700 bg-zinc-950 text-zinc-100 placeholder:text-zinc-500"
             onKeyDown={(e) => {
               if (e.key === "Enter" && query.trim()) {
                 requestBrief(query.trim());
