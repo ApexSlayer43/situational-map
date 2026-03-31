@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 
 export const runtime = "nodejs";
-export const revalidate = 15;
+export const dynamic = "force-dynamic";
+export const maxDuration = 15;
 
 interface OpenSkyState {
   icao24: string;
@@ -56,35 +57,47 @@ export async function GET() {
         ).toString("base64");
     }
 
-    // Fetch all regions in parallel
-    const results = await Promise.allSettled(
-      REGIONS.map((r) => fetchRegion(r, headers))
+    // Try global first, fall back to regional if rate-limited
+    let rawStates: unknown[][] = [];
+
+    const globalRes = await fetchRegion(
+      { lamin: -90, lamax: 90, lomin: -180, lomax: 180 },
+      headers
     );
+
+    if (globalRes.length > 0) {
+      rawStates = globalRes as unknown[][];
+    } else {
+      // Global failed — try regions sequentially with small delays
+      for (const region of REGIONS) {
+        const regionStates = await fetchRegion(region, headers);
+        rawStates.push(...(regionStates as unknown[][]));
+        // Small delay between requests to avoid rate limit
+        await new Promise((r) => setTimeout(r, 500));
+      }
+    }
 
     // Deduplicate by icao24
     const seen = new Set<string>();
     const allStates: OpenSkyState[] = [];
 
-    for (const result of results) {
-      if (result.status !== "fulfilled") continue;
-      for (const s of result.value as unknown[][]) {
-        if (!s || s[5] == null || s[6] == null || s[8]) continue; // needs coords, airborne
-        const icao24 = s[0] as string;
-        if (seen.has(icao24)) continue;
-        seen.add(icao24);
-        allStates.push({
-          icao24,
-          callsign: (s[1] as string)?.trim() || null,
-          origin_country: s[2] as string,
-          longitude: s[5] as number,
-          latitude: s[6] as number,
-          baro_altitude: s[7] as number | null,
-          velocity: s[9] as number | null,
-          true_track: s[10] as number | null,
-          on_ground: s[8] as boolean,
-          category: (s[17] as number) ?? 0,
-        });
-      }
+    for (const s of rawStates) {
+      if (!s || s[5] == null || s[6] == null || s[8]) continue;
+      const icao24 = s[0] as string;
+      if (seen.has(icao24)) continue;
+      seen.add(icao24);
+      allStates.push({
+        icao24,
+        callsign: (s[1] as string)?.trim() || null,
+        origin_country: s[2] as string,
+        longitude: s[5] as number,
+        latitude: s[6] as number,
+        baro_altitude: s[7] as number | null,
+        velocity: s[9] as number | null,
+        true_track: s[10] as number | null,
+        on_ground: s[8] as boolean,
+        category: (s[17] as number) ?? 0,
+      });
     }
 
     // Cap at 500

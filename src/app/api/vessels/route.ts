@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import WebSocket from "ws";
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 export const maxDuration = 15;
 
 const AISSTREAM_URL = "wss://stream.aisstream.io/v0/stream";
@@ -30,7 +31,7 @@ export async function GET() {
   }
 
   try {
-    const vessels = await collectVessels(apiKey, 6000, 300);
+    const vessels = await collectVessels(apiKey, 8000, 300);
 
     return NextResponse.json({
       time: new Date().toISOString(),
