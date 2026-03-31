@@ -30,7 +30,7 @@ export async function GET() {
   }
 
   try {
-    const vessels = await collectVessels(apiKey, 4000, 300);
+    const vessels = await collectVessels(apiKey, 6000, 300);
 
     return NextResponse.json({
       time: new Date().toISOString(),
@@ -38,13 +38,14 @@ export async function GET() {
       source: "aisstream",
       vessels,
     });
-  } catch {
+  } catch (err) {
+    console.error("AISstream error:", err instanceof Error ? err.message : err);
     return NextResponse.json({
       time: new Date().toISOString(),
       count: 0,
       source: "unavailable",
       vessels: [],
-      note: "AISstream connection failed. Using synthetic data as fallback.",
+      note: `AISstream connection failed: ${err instanceof Error ? err.message : "unknown error"}`,
     });
   }
 }
@@ -114,14 +115,15 @@ function collectVessels(
       }
     });
 
-    ws.on("error", () => {
+    ws.on("error", (err) => {
+      console.error("AISstream WebSocket error:", err.message);
       clearTimeout(timeout);
       if (!settled) {
         settled = true;
         if (vesselMap.size > 0) {
           resolve(Array.from(vesselMap.values()));
         } else {
-          reject(new Error("AISstream connection error"));
+          reject(new Error(`AISstream WebSocket error: ${err.message}`));
         }
       }
     });

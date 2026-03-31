@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 export const runtime = "nodejs";
-export const revalidate = 10;
+export const revalidate = 15;
 
 interface OpenSkyState {
   icao24: string;
@@ -16,65 +16,87 @@ interface OpenSkyState {
   category: number;
 }
 
-export async function GET(request: Request) {
-  const { searchParams } = new URL(request.url);
-  const lamin = searchParams.get("lamin") ?? "-90";
-  const lamax = searchParams.get("lamax") ?? "90";
-  const lomin = searchParams.get("lomin") ?? "-180";
-  const lomax = searchParams.get("lomax") ?? "180";
+// Key regions to fetch — smaller bounding boxes are more reliable than global
+const REGIONS = [
+  { name: "us", lamin: 24, lamax: 50, lomin: -130, lomax: -65 },
+  { name: "europe", lamin: 35, lamax: 60, lomin: -10, lomax: 40 },
+  { name: "gulf", lamin: 20, lamax: 35, lomin: 40, lomax: 65 },
+  { name: "eastasia", lamin: 20, lamax: 45, lomin: 100, lomax: 145 },
+];
 
+async function fetchRegion(
+  region: { lamin: number; lamax: number; lomin: number; lomax: number },
+  headers: Record<string, string>
+): Promise<unknown[]> {
   try {
-    const url = `https://opensky-network.org/api/states/all?lamin=${lamin}&lamax=${lamax}&lomin=${lomin}&lomax=${lomax}`;
-
-    const headers: Record<string, string> = {
-      "User-Agent": "SituationalMap/1.0",
-    };
-
-    // Optional: basic auth for higher rate limits (free account at opensky-network.org)
-    if (process.env.OPENSKY_USERNAME && process.env.OPENSKY_PASSWORD) {
-      headers["Authorization"] =
-        "Basic " + Buffer.from(`${process.env.OPENSKY_USERNAME}:${process.env.OPENSKY_PASSWORD}`).toString("base64");
-    }
-
+    const url = `https://opensky-network.org/api/states/all?lamin=${region.lamin}&lamax=${region.lamax}&lomin=${region.lomin}&lomax=${region.lomax}`;
     const res = await fetch(url, {
       headers,
       signal: AbortSignal.timeout(10000),
     });
+    if (!res.ok) return [];
+    const data = await res.json();
+    return data.states || [];
+  } catch {
+    return [];
+  }
+}
 
-    if (!res.ok) {
-      return NextResponse.json(
-        { error: `OpenSky returned ${res.status}`, states: [] },
-        { status: res.status }
-      );
+export async function GET() {
+  try {
+    const headers: Record<string, string> = {
+      "User-Agent": "SituationalMap/1.0",
+    };
+
+    if (process.env.OPENSKY_USERNAME && process.env.OPENSKY_PASSWORD) {
+      headers["Authorization"] =
+        "Basic " +
+        Buffer.from(
+          `${process.env.OPENSKY_USERNAME}:${process.env.OPENSKY_PASSWORD}`
+        ).toString("base64");
     }
 
-    const data = await res.json();
+    // Fetch all regions in parallel
+    const results = await Promise.allSettled(
+      REGIONS.map((r) => fetchRegion(r, headers))
+    );
 
-    const states: OpenSkyState[] = (data.states || [])
-      .filter(
-        (s: unknown[]) =>
-          s[5] != null && s[6] != null && !s[8] // has coords and is airborne
-      )
-      .slice(0, 500) // cap to avoid payload bloat
-      .map((s: unknown[]) => ({
-        icao24: s[0] as string,
-        callsign: (s[1] as string)?.trim() || null,
-        origin_country: s[2] as string,
-        longitude: s[5] as number,
-        latitude: s[6] as number,
-        baro_altitude: s[7] as number | null,
-        velocity: s[9] as number | null,
-        true_track: s[10] as number | null,
-        on_ground: s[8] as boolean,
-        category: (s[17] as number) ?? 0,
-      }));
+    // Deduplicate by icao24
+    const seen = new Set<string>();
+    const allStates: OpenSkyState[] = [];
+
+    for (const result of results) {
+      if (result.status !== "fulfilled") continue;
+      for (const s of result.value as unknown[][]) {
+        if (!s || s[5] == null || s[6] == null || s[8]) continue; // needs coords, airborne
+        const icao24 = s[0] as string;
+        if (seen.has(icao24)) continue;
+        seen.add(icao24);
+        allStates.push({
+          icao24,
+          callsign: (s[1] as string)?.trim() || null,
+          origin_country: s[2] as string,
+          longitude: s[5] as number,
+          latitude: s[6] as number,
+          baro_altitude: s[7] as number | null,
+          velocity: s[9] as number | null,
+          true_track: s[10] as number | null,
+          on_ground: s[8] as boolean,
+          category: (s[17] as number) ?? 0,
+        });
+      }
+    }
+
+    // Cap at 500
+    const states = allStates.slice(0, 500);
 
     return NextResponse.json({
-      time: data.time,
+      time: Math.floor(Date.now() / 1000),
       count: states.length,
       states,
     });
   } catch (err) {
+    console.error("OpenSky error:", err instanceof Error ? err.message : err);
     return NextResponse.json(
       { error: "Failed to fetch from OpenSky", states: [] },
       { status: 502 }
