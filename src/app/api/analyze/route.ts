@@ -34,8 +34,7 @@ Your role:
 - Provide concise, actionable intelligence briefs in a professional military-analyst tone
 - Reference specific track IDs, regions, and corridors when relevant
 - Use severity tags: [ROUTINE], [NOTABLE], [ALERT], [CRITICAL]
-- When data is marked LIVE, treat it as real-world current conditions and analyze accordingly
-- When data is SIMULATED, note it is a demonstration scenario
+- All data is LIVE real-world feeds — analyze as actual current conditions
 
 Key regions of interest:
 - Strait of Hormuz (52-58°E, 23-28°N) — oil transit chokepoint
@@ -55,10 +54,9 @@ Keep it under 250 words. Be specific. No filler.`;
 
 export async function POST(request: Request) {
   try {
-    const { tracks, context, dataMode } = (await request.json()) as {
+    const { tracks, context } = (await request.json()) as {
       tracks: TrackSnapshot[];
       context?: string;
-      dataMode?: "live" | "simulated";
     };
 
     if (!process.env.ANTHROPIC_API_KEY) {
@@ -71,8 +69,6 @@ export async function POST(request: Request) {
       );
     }
 
-    const isLive = dataMode === "live";
-    const liveCount = tracks.filter((t) => t.isLive).length;
     const aircraftCount = tracks.filter((t) => t.type === "aircraft").length;
     const vesselCount = tracks.filter((t) => t.type === "vessel").length;
     const satelliteCount = tracks.filter((t) => t.type === "satellite").length;
@@ -101,8 +97,7 @@ export async function POST(request: Request) {
       : "";
 
     const snapshot = `GLOBAL TRACK PICTURE (${new Date().toISOString()}):
-DATA MODE: ${isLive ? "LIVE — real-world data from OpenSky, AISstream, CelesTrak, USGS" : "SIMULATED — synthetic demonstration data"}
-${isLive ? `Live tracks: ${liveCount} of ${tracks.length} total` : ""}
+DATA: LIVE — real-world data from OpenSky (ADS-B), AISstream (AIS), CelesTrak (TLE), USGS (seismic)
 - Total tracks: ${tracks.length} (${aircraftCount} aircraft, ${vesselCount} vessels, ${satelliteCount} satellites, ${seismicCount} seismic events)
 - Military-tagged: ${militaryCount}
 - Hormuz corridor: ${hormuz.length} assets
@@ -116,12 +111,12 @@ ${tracks
   .slice(0, 20)
   .map(
     (t) =>
-      `  ${t.isLive ? "[LIVE]" : "[SIM]"} ${t.id} | ${t.type} | ${t.operator} | ${t.category} | ${t.lat.toFixed(1)}°N ${t.lon.toFixed(1)}°E | ${t.speed}${t.type === "aircraft" ? "kt" : "kn"} | hdg ${Math.round(t.heading)}°`
+      `  ${t.id} | ${t.type} | ${t.operator} | ${t.category} | ${t.lat.toFixed(1)}°N ${t.lon.toFixed(1)}°E | ${t.speed}${t.type === "aircraft" ? "kt" : "kn"} | hdg ${Math.round(t.heading)}°`
   )
   .join("\n")}
 
 ${context ? `ANALYST QUERY: ${context}` : "Provide a standard situational brief."}
-${isLive ? "IMPORTANT: This is LIVE real-world data. Base your analysis on actual current conditions." : "NOTE: This is simulated data for demonstration purposes."}`;
+IMPORTANT: This is LIVE real-world data. Base your analysis on actual current conditions.`;
 
     const result = streamText({
       model: anthropic("claude-haiku-4-5-20251001"),

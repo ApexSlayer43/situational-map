@@ -16,10 +16,9 @@ import type { Track } from "@/types";
 
 interface AnalystPanelProps {
   tracks: Track[];
-  useRealData: boolean;
 }
 
-export function AnalystPanel({ tracks, useRealData }: AnalystPanelProps) {
+export function AnalystPanel({ tracks }: AnalystPanelProps) {
   const [query, setQuery] = useState("");
   const [lastBrief, setLastBrief] = useState<string | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -31,10 +30,7 @@ export function AnalystPanel({ tracks, useRealData }: AnalystPanelProps) {
       setFallbackBrief(null);
 
       try {
-        // Prioritize live tracks for analysis, fall back to synthetic
-        const liveTracks = tracks.filter((t) => t.isLive);
-        const source = liveTracks.length > 0 ? liveTracks : tracks;
-        const snapshot = source.slice(0, 60).map((t) => ({
+        const snapshot = tracks.slice(0, 60).map((t) => ({
           id: t.id,
           type: t.type,
           category: t.category,
@@ -52,7 +48,7 @@ export function AnalystPanel({ tracks, useRealData }: AnalystPanelProps) {
         const res = await fetch("/api/analyze", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ tracks: snapshot, context, dataMode: useRealData ? "live" : "simulated" }),
+          body: JSON.stringify({ tracks: snapshot, context, dataMode: "live" }),
         });
 
         const contentType = res.headers.get("content-type") || "";
